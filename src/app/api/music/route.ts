@@ -1,5 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase";
+import { createClient } from "@supabase/supabase-js";
+
+// Create Supabase client at runtime to ensure env vars are available
+function getSupabase() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error("Supabase environment variables not configured");
+  }
+
+  return createClient(supabaseUrl, supabaseAnonKey);
+}
 
 interface MusicSettingsValue {
   enabled?: boolean;
@@ -10,6 +22,7 @@ interface MusicSettingsValue {
 // GET - Fetch current music settings
 export async function GET() {
   try {
+    const supabase = getSupabase();
     const { data, error } = await supabase
       .from("settings")
       .select("*")
@@ -48,6 +61,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const supabase = getSupabase();
     const { error } = await supabase.from("settings").upsert(
       {
         key: "background_music",
