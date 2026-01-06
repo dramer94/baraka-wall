@@ -76,8 +76,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Error updating music settings:", error);
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
     return NextResponse.json(
-      { error: "Failed to update settings" },
+      { error: "Failed to update settings", details: errorMessage },
       { status: 500 }
     );
   }
