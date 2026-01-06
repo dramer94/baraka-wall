@@ -71,7 +71,12 @@ export async function POST(request: NextRequest) {
       { onConflict: "key" }
     );
 
-    if (error) throw error;
+    if (error) {
+      return NextResponse.json(
+        { error: "Supabase error", details: error.message, code: error.code },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {
