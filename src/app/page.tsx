@@ -137,19 +137,18 @@ export default function Home() {
       )}
 
       {/* Hidden audio/YouTube player */}
-      {musicEnabled && (
+      {musicEnabled && hasInteracted && (
         <>
           {isYouTubeUrl(musicUrl) ? (
             <iframe
               ref={youtubeRef}
-              className="hidden"
-              width="0"
-              height="0"
-              src={`https://www.youtube.com/embed/${getYouTubeVideoId(musicUrl)}?enablejsapi=1&autoplay=${hasInteracted && isPlaying ? 1 : 0}&loop=1&playlist=${getYouTubeVideoId(musicUrl)}`}
-              allow="autoplay"
+              className="fixed bottom-0 left-0 w-0 h-0 opacity-0 pointer-events-none"
+              src={`https://www.youtube.com/embed/${getYouTubeVideoId(musicUrl)}?enablejsapi=1&autoplay=1&loop=1&playlist=${getYouTubeVideoId(musicUrl)}`}
+              allow="autoplay; encrypted-media"
+              title="Background Music"
             />
           ) : (
-            <audio ref={audioRef} src={musicUrl} loop />
+            <audio ref={audioRef} src={musicUrl} loop autoPlay />
           )}
         </>
       )}
