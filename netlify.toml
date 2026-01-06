@@ -8,6 +8,8 @@
 [build.environment]
   NODE_VERSION = "20"
   NPM_FLAGS = "--legacy-peer-deps"
+  # Skip secrets scanning for public env vars (they're meant to be exposed in Next.js)
+  SECRETS_SCAN_OMIT_KEYS = "NEXT_PUBLIC_COUPLE_NAMES,NEXT_PUBLIC_WEDDING_DATE,NEXT_PUBLIC_SUPABASE_URL,NEXT_PUBLIC_SUPABASE_ANON_KEY"
 
 # Environment variables will be set in Netlify dashboard
 # Required variables:
