@@ -10,6 +10,26 @@ interface MusicSettings {
   title: string;
 }
 
+interface RSVP {
+  id: string;
+  guest_name: string;
+  email: string | null;
+  phone: string | null;
+  attendance: 'attending' | 'not_attending' | 'maybe';
+  guest_count: number;
+  dietary_restrictions: string | null;
+  message: string | null;
+  created_at: string;
+}
+
+interface RSVPStats {
+  total: number;
+  attending: number;
+  notAttending: number;
+  maybe: number;
+  totalGuests: number;
+}
+
 export default function AdminPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [password, setPassword] = useState("");
@@ -30,6 +50,18 @@ export default function AdminPage() {
   });
   const [savingMusic, setSavingMusic] = useState(false);
   const [musicSaved, setMusicSaved] = useState(false);
+
+  // RSVP state
+  const [rsvps, setRsvps] = useState<RSVP[]>([]);
+  const [rsvpStats, setRsvpStats] = useState<RSVPStats>({
+    total: 0,
+    attending: 0,
+    notAttending: 0,
+    maybe: 0,
+    totalGuests: 0,
+  });
+  const [deletingRsvp, setDeletingRsvp] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'submissions' | 'rsvp'>('submissions');
 
   const authenticate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -173,6 +205,49 @@ export default function AdminPage() {
     }
   }, []);
 
+  // Fetch RSVPs
+  const fetchRsvps = useCallback(async () => {
+    if (!isAuthenticated) return;
+
+    try {
+      const storedPassword = sessionStorage.getItem("admin_password") || password;
+      const response = await fetch(`/api/rsvp?password=${encodeURIComponent(storedPassword)}`);
+      const data = await response.json();
+
+      if (response.ok) {
+        setRsvps(data.rsvps || []);
+        setRsvpStats(data.stats || { total: 0, attending: 0, notAttending: 0, maybe: 0, totalGuests: 0 });
+      }
+    } catch (error) {
+      console.error("Error fetching RSVPs:", error);
+    }
+  }, [isAuthenticated, password]);
+
+  // Delete RSVP
+  const deleteRsvp = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this RSVP?")) return;
+
+    setDeletingRsvp(id);
+    try {
+      const storedPassword = sessionStorage.getItem("admin_password") || password;
+      const response = await fetch(`/api/rsvp?password=${encodeURIComponent(storedPassword)}&id=${id}`, {
+        method: "DELETE",
+      });
+
+      if (response.ok) {
+        setRsvps((prev) => prev.filter((r) => r.id !== id));
+        fetchRsvps(); // Refresh stats
+      } else {
+        alert("Failed to delete RSVP");
+      }
+    } catch (error) {
+      console.error("Error deleting RSVP:", error);
+      alert("Failed to delete RSVP");
+    } finally {
+      setDeletingRsvp(null);
+    }
+  };
+
   // Save music settings
   const saveMusicSettings = async () => {
     setSavingMusic(true);
@@ -217,8 +292,9 @@ export default function AdminPage() {
     fetchSubmissions();
     if (isAuthenticated) {
       fetchMusicSettings();
+      fetchRsvps();
     }
-  }, [fetchSubmissions, isAuthenticated, fetchMusicSettings]);
+  }, [fetchSubmissions, isAuthenticated, fetchMusicSettings, fetchRsvps]);
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -409,40 +485,109 @@ export default function AdminPage() {
               </div>
             </div>
           </Link>
+
+          <Link
+            href="/rsvp"
+            className="bg-white rounded-xl p-4 border border-[var(--blush)] hover:border-[var(--gold)] hover:shadow-md transition-all group"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-[var(--cream)] flex items-center justify-center group-hover:bg-[var(--gold)] transition-colors">
+                <svg className="w-5 h-5 text-[var(--gold)] group-hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <div>
+                <div className="font-medium text-[var(--foreground)]">RSVP Page</div>
+                <div className="text-xs text-gray-500">Guest confirmation</div>
+              </div>
+            </div>
+          </Link>
         </div>
 
-        {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          <div className="bg-white rounded-xl p-4 border border-[var(--blush)]">
-            <div className="text-3xl font-bold text-[var(--gold)]">{stats.total}</div>
-            <div className="text-sm text-gray-500">Total Submissions</div>
-          </div>
-          <div className="bg-white rounded-xl p-4 border border-[var(--blush)]">
-            <div className="text-3xl font-bold text-[var(--blush-dark)]">
-              {Object.keys(stats.byTable).length}
-            </div>
-            <div className="text-sm text-gray-500">Tables Represented</div>
-          </div>
-          <div className="col-span-2 bg-white rounded-xl p-4 border border-[var(--blush)]">
-            <div className="text-sm text-gray-500 mb-2">Submissions by Table</div>
-            <div className="flex flex-wrap gap-2">
-              {Object.entries(stats.byTable)
-                .filter(([, count]) => count > 0)
-                .sort(([a], [b]) => parseInt(a) - parseInt(b))
-                .map(([table, count]) => (
-                  <span
-                    key={table}
-                    className="px-2 py-1 bg-[var(--cream)] rounded-full text-xs text-gray-600"
-                  >
-                    Table {table}: {count}
-                  </span>
-                ))}
-              {Object.keys(stats.byTable).length === 0 && (
-                <span className="text-gray-400 text-sm">No table data yet</span>
-              )}
-            </div>
-          </div>
+        {/* Tabs */}
+        <div className="flex gap-2 mb-6">
+          <button
+            onClick={() => setActiveTab('submissions')}
+            className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+              activeTab === 'submissions'
+                ? 'bg-[var(--gold)] text-white'
+                : 'bg-white border border-[var(--blush)] text-gray-600 hover:border-[var(--gold)]'
+            }`}
+          >
+            Photos & Messages ({stats.total})
+          </button>
+          <button
+            onClick={() => setActiveTab('rsvp')}
+            className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+              activeTab === 'rsvp'
+                ? 'bg-[var(--gold)] text-white'
+                : 'bg-white border border-[var(--blush)] text-gray-600 hover:border-[var(--gold)]'
+            }`}
+          >
+            RSVPs ({rsvpStats.total})
+          </button>
         </div>
+
+        {/* RSVP Stats - show when RSVP tab active */}
+        {activeTab === 'rsvp' && (
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
+            <div className="bg-white rounded-xl p-4 border border-[var(--blush)]">
+              <div className="text-3xl font-bold text-[var(--gold)]">{rsvpStats.total}</div>
+              <div className="text-sm text-gray-500">Total Responses</div>
+            </div>
+            <div className="bg-white rounded-xl p-4 border border-green-200">
+              <div className="text-3xl font-bold text-green-600">{rsvpStats.attending}</div>
+              <div className="text-sm text-gray-500">Attending</div>
+            </div>
+            <div className="bg-white rounded-xl p-4 border border-yellow-200">
+              <div className="text-3xl font-bold text-yellow-600">{rsvpStats.maybe}</div>
+              <div className="text-sm text-gray-500">Maybe</div>
+            </div>
+            <div className="bg-white rounded-xl p-4 border border-gray-200">
+              <div className="text-3xl font-bold text-gray-600">{rsvpStats.notAttending}</div>
+              <div className="text-sm text-gray-500">Not Attending</div>
+            </div>
+            <div className="bg-white rounded-xl p-4 border border-[var(--blush)]">
+              <div className="text-3xl font-bold text-[var(--rose-gold)]">{rsvpStats.totalGuests}</div>
+              <div className="text-sm text-gray-500">Total Guests</div>
+            </div>
+          </div>
+        )}
+
+        {/* Submission Stats - show when submissions tab active */}
+        {activeTab === 'submissions' && (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+            <div className="bg-white rounded-xl p-4 border border-[var(--blush)]">
+              <div className="text-3xl font-bold text-[var(--gold)]">{stats.total}</div>
+              <div className="text-sm text-gray-500">Total Submissions</div>
+            </div>
+            <div className="bg-white rounded-xl p-4 border border-[var(--blush)]">
+              <div className="text-3xl font-bold text-[var(--blush-dark)]">
+                {Object.keys(stats.byTable).length}
+              </div>
+              <div className="text-sm text-gray-500">Tables Represented</div>
+            </div>
+            <div className="col-span-2 bg-white rounded-xl p-4 border border-[var(--blush)]">
+              <div className="text-sm text-gray-500 mb-2">Submissions by Table</div>
+              <div className="flex flex-wrap gap-2">
+                {Object.entries(stats.byTable)
+                  .filter(([, count]) => count > 0)
+                  .sort(([a], [b]) => parseInt(a) - parseInt(b))
+                  .map(([table, count]) => (
+                    <span
+                      key={table}
+                      className="px-2 py-1 bg-[var(--cream)] rounded-full text-xs text-gray-600"
+                    >
+                      Table {table}: {count}
+                    </span>
+                  ))}
+                {Object.keys(stats.byTable).length === 0 && (
+                  <span className="text-gray-400 text-sm">No table data yet</span>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Music Settings */}
         <div className="mb-8 bg-white rounded-xl p-6 border border-[var(--blush)]">
@@ -525,8 +670,99 @@ export default function AdminPage() {
           </div>
         </div>
 
-        {/* Submissions List */}
-        {loading ? (
+        {/* RSVP List - show when RSVP tab active */}
+        {activeTab === 'rsvp' && (
+          <div className="space-y-4">
+            {rsvps.length === 0 ? (
+              <div className="text-center py-20">
+                <svg className="w-16 h-16 mx-auto text-[var(--blush)] mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <h2 className="text-xl font-semibold text-gray-600 mb-2">No RSVPs yet</h2>
+                <p className="text-gray-500">Share your RSVP link with guests to start collecting responses.</p>
+              </div>
+            ) : (
+              rsvps.map((rsvp) => (
+                <div
+                  key={rsvp.id}
+                  className="bg-white rounded-xl p-4 border border-[var(--blush)]"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-2">
+                        <span className="font-medium text-[var(--foreground)]">{rsvp.guest_name}</span>
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                          rsvp.attendance === 'attending'
+                            ? 'bg-green-100 text-green-700'
+                            : rsvp.attendance === 'maybe'
+                            ? 'bg-yellow-100 text-yellow-700'
+                            : 'bg-gray-100 text-gray-600'
+                        }`}>
+                          {rsvp.attendance === 'attending' && '✓ Attending'}
+                          {rsvp.attendance === 'maybe' && '? Maybe'}
+                          {rsvp.attendance === 'not_attending' && '✕ Not Attending'}
+                        </span>
+                        {rsvp.attendance === 'attending' && (
+                          <span className="text-sm text-[var(--gold)]">
+                            {rsvp.guest_count} {rsvp.guest_count === 1 ? 'guest' : 'guests'}
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-xs text-gray-400 mb-2">
+                        {formatDate(rsvp.created_at)}
+                      </div>
+                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-500">
+                        {rsvp.email && (
+                          <span className="flex items-center gap-1">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                            </svg>
+                            {rsvp.email}
+                          </span>
+                        )}
+                        {rsvp.phone && (
+                          <span className="flex items-center gap-1">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                            </svg>
+                            {rsvp.phone}
+                          </span>
+                        )}
+                      </div>
+                      {rsvp.dietary_restrictions && (
+                        <div className="mt-2 text-sm text-gray-600">
+                          <span className="text-gray-400">Dietary:</span> {rsvp.dietary_restrictions}
+                        </div>
+                      )}
+                      {rsvp.message && (
+                        <div className="mt-2 text-sm text-gray-600 italic">
+                          &ldquo;{rsvp.message}&rdquo;
+                        </div>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => deleteRsvp(rsvp.id)}
+                      disabled={deletingRsvp === rsvp.id}
+                      className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                      title="Delete RSVP"
+                    >
+                      {deletingRsvp === rsvp.id ? (
+                        <div className="spinner !w-4 !h-4 !border-2 !border-red-200 !border-t-red-500" />
+                      ) : (
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+
+        {/* Submissions List - show when submissions tab active */}
+        {activeTab === 'submissions' && (loading ? (
           <div className="flex flex-col items-center justify-center py-20">
             <div className="spinner mb-4" />
             <p className="text-gray-500">Loading submissions...</p>
@@ -600,7 +836,7 @@ export default function AdminPage() {
               </div>
             ))}
           </div>
-        )}
+        ))}
       </div>
     </main>
   );

@@ -54,6 +54,42 @@ export interface Database {
         }
         Relationships: []
       }
+      rsvp: {
+        Row: {
+          id: string
+          guest_name: string
+          email: string | null
+          phone: string | null
+          attendance: 'attending' | 'not_attending' | 'maybe'
+          guest_count: number
+          dietary_restrictions: string | null
+          message: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          guest_name: string
+          email?: string | null
+          phone?: string | null
+          attendance: 'attending' | 'not_attending' | 'maybe'
+          guest_count?: number
+          dietary_restrictions?: string | null
+          message?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          guest_name?: string
+          email?: string | null
+          phone?: string | null
+          attendance?: 'attending' | 'not_attending' | 'maybe'
+          guest_count?: number
+          dietary_restrictions?: string | null
+          message?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -72,3 +108,6 @@ export interface Database {
 
 export type Submission = Database['public']['Tables']['submissions']['Row']
 export type NewSubmission = Database['public']['Tables']['submissions']['Insert']
+
+export type RSVP = Database['public']['Tables']['rsvp']['Row']
+export type NewRSVP = Database['public']['Tables']['rsvp']['Insert']
