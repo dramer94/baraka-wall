@@ -48,11 +48,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { error } = await supabase.from("settings").upsert({
-      key: "background_music",
-      value: { enabled, url, title },
-      updated_at: new Date().toISOString(),
-    });
+    const { error } = await supabase.from("settings").upsert(
+      {
+        key: "background_music",
+        value: { enabled, url, title },
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "key" }
+    );
 
     if (error) throw error;
 
