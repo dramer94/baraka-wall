@@ -136,17 +136,20 @@ export default function Home() {
         </div>
       )}
 
-      {/* Hidden audio/YouTube player */}
+      {/* Audio/YouTube player - visible small player for mobile compatibility */}
       {musicEnabled && hasInteracted && (
         <>
           {isYouTubeUrl(musicUrl) ? (
-            <iframe
-              ref={youtubeRef}
-              className="fixed bottom-0 left-0 w-0 h-0 opacity-0 pointer-events-none"
-              src={`https://www.youtube.com/embed/${getYouTubeVideoId(musicUrl)}?enablejsapi=1&autoplay=1&loop=1&playlist=${getYouTubeVideoId(musicUrl)}`}
-              allow="autoplay; encrypted-media"
-              title="Background Music"
-            />
+            <div className="fixed bottom-20 right-4 z-30 w-[200px] h-[112px] rounded-lg overflow-hidden shadow-lg border-2 border-white/50 bg-black">
+              <iframe
+                ref={youtubeRef}
+                className="w-full h-full"
+                src={`https://www.youtube.com/embed/${getYouTubeVideoId(musicUrl)}?enablejsapi=1&autoplay=1&loop=1&playlist=${getYouTubeVideoId(musicUrl)}&playsinline=1`}
+                allow="autoplay; encrypted-media; fullscreen"
+                allowFullScreen
+                title="Background Music"
+              />
+            </div>
           ) : (
             <audio ref={audioRef} src={musicUrl} loop autoPlay />
           )}
